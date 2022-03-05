@@ -1,4 +1,4 @@
-from transformers import GPT2LMHeadModel, GPTNeoForCausalLM, GPTJForCausalLM
+from transformers import GPT2LMHeadModel, GPTNeoForCausalLM, GPTJForCausalLM, XGLMForCausalLM
 from mkultra.soft_prompt import SoftPrompt
 import torch
 import torch.nn as nn
@@ -17,7 +17,7 @@ class GPTPromptTuningMixin:
 
     def initialize_soft_prompt(self, n_tokens = 20):
         self.learned_embedding = nn.parameter.Parameter(
-            self.transformer.wte.weight[:n_tokens].clone().detach())
+            (self.transformer.wte if hasattr(self, "transformer") else self.model.embed_tokens).weight[:n_tokens].clone().detach())
 
     def set_soft_prompt_embeds(self, soft_prompt_embeds):
         self.learned_embedding = nn.parameter.Parameter(soft_prompt_embeds.clone().detach())
@@ -34,7 +34,7 @@ class GPTPromptTuningMixin:
         return super().prepare_inputs_for_generation(input_ids, None, *args, **kwargs)
 
     def _cat_learned_embedding_to_input(self, input_ids):
-        inputs_embeds = self.transformer.wte(input_ids)
+        inputs_embeds = (self.transformer.wte if hasattr(self, "transformer") else self.model.embed_tokens)(input_ids)
 
         if len(list(inputs_embeds.shape)) == 2:
             ie = inputs_embeds.unsqueeze(0)
@@ -46,6 +46,9 @@ class GPTPromptTuningMixin:
         inputs_embeds = torch.cat([learned_embedding.repeat(ie.size(0), 1, 1),
                                    ie],
                                    dim=1)
+        
+        if hasattr(self, "model"):
+            inputs_embeds *= self.model.embed_scale
 
         return inputs_embeds
 
@@ -123,5 +126,9 @@ class GPTNeoPromptTuningLM(GPTPromptTuningMixin, GPTNeoForCausalLM):
         super().__init__(config)
 
 class GPTJPromptTuningLM(GPTPromptTuningMixin, GPTJForCausalLM):
+    def __init__(self, config):
+        super().__init__(config)
+
+class XGLMPromptTuningLM(GPTPromptTuningMixin, GPTJForCausalLM):
     def __init__(self, config):
         super().__init__(config)
