@@ -198,6 +198,8 @@ class UniversalPromptTuningMixin:
         input_ids=None,
         attention_mask=None,
         labels=None,
+        use_cache=None,
+        return_dict=None,
         **kwargs,
     ):
         assert input_ids is not None
@@ -224,11 +226,13 @@ class UniversalPromptTuningMixin:
         Embedding.__call__ = new_embedding_call
 
         try:
+            # Drop most of the args for now
             return super().forward(
-                attention_mask=attention_mask,
                 input_ids=input_ids,
+                attention_mask=attention_mask,
                 labels=labels,
-                **kwargs,
+                use_cache=use_cache,
+                return_dict=return_dict,
             )
         finally:
             Embedding.__call__ = old_embedding_call
